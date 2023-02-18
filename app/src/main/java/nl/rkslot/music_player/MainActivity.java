@@ -1,6 +1,7 @@
 package nl.rkslot.music_player;
 
-import android.app.Activity;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
@@ -12,9 +13,8 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.activity.result.ActivityResultLauncher;
-import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.NotificationCompat;
 import androidx.preference.PreferenceManager;
 
 public class MainActivity extends AppCompatActivity {
@@ -23,6 +23,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(final Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        registerNotificationChannels();
     }
 
     @Override
@@ -86,25 +87,6 @@ public class MainActivity extends AppCompatActivity {
         startActivity(intent);
     }
 
-    private final ActivityResultLauncher<Intent> directorySelected = registerForActivityResult(
-            new ActivityResultContracts.StartActivityForResult(),
-            result -> {
-                System.out.println("Done!");
-                System.out.println(result.getResultCode());
-                if (result.getResultCode() == Activity.RESULT_OK) {
-                    // There are no request codes
-                    Intent data = result.getData();
-                    System.out.println(data.getData().toString());
-
-                    Uri baseDirectoryUri = data.getData();
-
-
-
-
-                }
-            });
-
-
     public void onSyncButtonClick(final View view) {
         final SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
         final String username = prefs.getString("username", "");
@@ -130,6 +112,20 @@ public class MainActivity extends AppCompatActivity {
         this.getApp().startSyncTask(this.getSyncTaskCallbacks(), username, password, uri);
     }
 
+    private static final String NOTIFICATION_ID_SYNC_PROGRESS = "sync_progress";
+
+    private void registerNotificationChannels() {
+        NotificationManager notificationManager = getSystemService(NotificationManager.class);
+        for (NotificationChannel channel : notificationManager.getNotificationChannels()) {
+            if (!channel.getId().equals(NOTIFICATION_ID_SYNC_PROGRESS)) {
+                notificationManager.deleteNotificationChannel(channel.getId());
+            }
+        }
+
+        NotificationChannel channel = new NotificationChannel(NOTIFICATION_ID_SYNC_PROGRESS, "Sync progress", NotificationManager.IMPORTANCE_LOW);
+        notificationManager.createNotificationChannel(channel);
+    }
+
     private SyncTask.Callbacks getSyncTaskCallbacks() {
         final ProgressBar progressBar = findViewById(R.id.syncProgressBar);
         final TextView textView = findViewById(R.id.log);
@@ -137,21 +133,46 @@ public class MainActivity extends AppCompatActivity {
 
         return new SyncTask.Callbacks() {
 
+            private int previousProgress = -1;
+
+            private void sendNotification(int progress, int progressMax, boolean indeterminate) {
+                NotificationManager notificationManager = getSystemService(NotificationManager.class);
+                NotificationCompat.Builder builder = new NotificationCompat.Builder(MainActivity.this, NOTIFICATION_ID_SYNC_PROGRESS);
+                builder.setContentTitle("Downloading")
+                        .setContentText("Synchronising music from music player")
+                        .setSmallIcon(R.drawable.music);
+
+                // Issue the initial notification with zero progress
+                builder.setProgress(progressMax, progress, indeterminate);
+                notificationManager.notify(1, builder.build());
+            }
+
             @Override
             public void onStart() {
                 syncButton.post(() -> syncButton.setEnabled(false));
                 progressBar.post(() -> {
                     progressBar.setIndeterminate(true);
                 });
+
+                runOnUiThread(() -> {
+                    sendNotification(0, 0, true);
+                });
             }
 
             @Override
-            public void setProgress(int progress, int maxProgress) {
+            public void setProgress(int progress, int progressMax) {
                 progressBar.post(() -> {
                     progressBar.setIndeterminate(false);
                     progressBar.setProgress(progress);
-                    progressBar.setMax(maxProgress);
+                    progressBar.setMax(progressMax);
                 });
+
+                if (progress != this.previousProgress) {
+                    runOnUiThread(() -> {
+                        sendNotification(progress, progressMax, false);
+                    });
+                    this.previousProgress = progress;
+                }
             }
 
             @Override
