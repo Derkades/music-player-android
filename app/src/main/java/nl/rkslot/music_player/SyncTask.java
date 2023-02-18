@@ -209,14 +209,6 @@ public class SyncTask implements Runnable {
         }
     }
 
-    private String serverNameToDeviceName(String serverName) {
-        return serverName + ".mp3";
-    }
-
-    private String deviceNameToServerName(String deviceName) {
-        return deviceName.substring(0, deviceName.length() - 4);
-    }
-
     private void log(String message) {
         if (this.callbacks != null) {
             this.callbacks.log(message);
@@ -245,7 +237,7 @@ public class SyncTask implements Runnable {
 
         for (Track track : tracksInCurrentDirectoryAndChildren) {
             if (track.getSplitPath().length == level + 1) {
-                String deviceFileName = serverNameToDeviceName(track.getSplitPath()[level]);
+                String deviceFileName = track.getDisplay() + ".mp3";
                 // File should be created in current directory
                 filesToCreateAndDownload.put(deviceFileName, track);
                 continue;
