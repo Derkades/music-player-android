@@ -237,7 +237,7 @@ public class SyncTask implements Runnable {
 
         for (Track track : tracksInCurrentDirectoryAndChildren) {
             if (track.getSplitPath().length == level + 1) {
-                String deviceFileName = track.getDisplay() + ".mp3";
+                String deviceFileName = track.getLocalFileName();
                 // File should be created in current directory
                 filesToCreateAndDownload.put(deviceFileName, track);
                 continue;

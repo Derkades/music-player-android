@@ -9,7 +9,10 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class Track {
 
@@ -64,6 +67,19 @@ public class Track {
 
     public String getDisplay() {
         return this.display;
+    }
+
+    private static final Set<Character> ILLEGAL_CHARS = new HashSet<>(Arrays.asList('|', '\\', '?', '*', '<', '"', ':', '>', '+', '[', ']', '/', '\''));
+
+    public String getLocalFileName() {
+        StringBuilder name = new StringBuilder();
+        for (char c : this.display.toCharArray()) {
+            if (!ILLEGAL_CHARS.contains(c)) {
+                name.append(c);
+            }
+        }
+        name.append(".mp3");
+        return name.toString();
     }
 
     public int getDuration() {
