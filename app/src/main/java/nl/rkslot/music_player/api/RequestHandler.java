@@ -1,5 +1,9 @@
 package nl.rkslot.music_player.api;
 
+import android.os.Parcel;
+import android.os.Parcelable;
+
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.google.gson.JsonElement;
@@ -14,11 +18,12 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
-public class RequestHandler {
+public class RequestHandler implements Parcelable {
     private static final String BASE_URL = "https://music.rkslot.nl/";
 //    private static final String BASE_URL = "http://10.0.1.3:8080/";
     private static final String USER_AGENT = "Music-Player-Android";
@@ -26,6 +31,22 @@ public class RequestHandler {
     private @Nullable String authToken;
 
     public RequestHandler() {}
+
+    protected RequestHandler(Parcel in) {
+        authToken = in.readString();
+    }
+
+    public static final Creator<RequestHandler> CREATOR = new Creator<RequestHandler>() {
+        @Override
+        public RequestHandler createFromParcel(Parcel in) {
+            return new RequestHandler(in);
+        }
+
+        @Override
+        public RequestHandler[] newArray(int size) {
+            return new RequestHandler[size];
+        }
+    };
 
     HttpURLConnection openConnection(String path) throws IOException {
         HttpURLConnection conn = (HttpURLConnection) new URL(this.BASE_URL + path).openConnection();
@@ -89,13 +110,11 @@ public class RequestHandler {
         this.jsonPost(conn, json);
         final JsonObject response = this.readResponseAsJson(conn);
         this.authToken = response.get("token").getAsString();
-        System.out.println("Obtained session token: " + this.authToken);
     }
 
     public List<Playlist> getPlaylists() throws IOException {
         HttpURLConnection conn = this.openConnection("track_list");
         final JsonObject response = this.readResponseAsJson(conn);
-        System.out.println(response.toString());
         List<Playlist> playlists = new ArrayList<>();
         for (JsonElement elem : response.getAsJsonArray("playlists")) {
             playlists.add(new Playlist(this, elem.getAsJsonObject()));
@@ -103,10 +122,20 @@ public class RequestHandler {
         return playlists;
     }
 
-//    public byte[] getOriginalFile(Track track) throws IOException {
-//        String encodedPath = URLEncoder.encode(track.getPath(), StandardCharsets.UTF_8.toString());
-//        HttpURLConnection conn = this.openConnection("files_download?path=" + encodedPath);
-//        return this.readResponseToBytes(conn);
-//    }
+    @Override
+    public int describeContents() {
+        return 0;
+    }
+
+    @Override
+    public void writeToParcel(@NonNull Parcel dest, int flags) {
+        dest.writeString(authToken);
+    }
+
+    public byte[] getOriginalFile(Track track) throws IOException {
+        String encodedPath = URLEncoder.encode(track.getPath(), StandardCharsets.UTF_8.toString());
+        HttpURLConnection conn = this.openConnection("files_download?path=" + encodedPath);
+        return this.readResponseToBytes(conn);
+    }
 
 }

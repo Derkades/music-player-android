@@ -8,13 +8,9 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
-import android.widget.ProgressBar;
-import android.widget.ScrollView;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.NotificationCompat;
 import androidx.preference.PreferenceManager;
 
 public class MainActivity extends AppCompatActivity {
@@ -32,14 +28,6 @@ public class MainActivity extends AppCompatActivity {
 
         final Button syncButton = findViewById(R.id.sync);
         bundle.putBoolean("syncButtonEnabled", syncButton.isEnabled());
-
-        final TextView logTextView = findViewById(R.id.log);
-        bundle.putCharSequence("logText", logTextView.getText());
-
-        final ProgressBar progressBar = findViewById(R.id.syncProgressBar);
-        bundle.putBoolean("progressBarIndeterminate", progressBar.isIndeterminate());
-        bundle.putInt("progressBarProgress", progressBar.getProgress());
-        bundle.putInt("progressBarMax", progressBar.getMax());
     }
 
     @Override
@@ -48,34 +36,16 @@ public class MainActivity extends AppCompatActivity {
 
         final Button syncButton = findViewById(R.id.sync);
         syncButton.setEnabled(bundle.getBoolean("syncButtonEnabled"));
-
-        final TextView logTextView = findViewById(R.id.log);
-        logTextView.setText(bundle.getCharSequence("logText"));
-
-        final ProgressBar progressBar = findViewById(R.id.syncProgressBar);
-        progressBar.setIndeterminate(bundle.getBoolean("progressBarIndeterminate"));
-        progressBar.setProgress(bundle.getInt("progressBarProgress"));
-        progressBar.setMax(bundle.getInt("progressBarMax"));
     }
 
     @Override
     public void onStop() {
         super.onStop();
-
-        final SyncTask task = this.getApp().getSyncTask();
-        if (task != null) {
-            task.setCallbacks(null);
-        }
     }
 
     @Override
     public void onResume() {
         super.onResume();
-
-        final SyncTask task = this.getApp().getSyncTask();
-        if (task != null) {
-            task.setCallbacks(this.getSyncTaskCallbacks());
-        }
     }
 
     private MusicPlayerApp getApp() {
@@ -109,92 +79,24 @@ public class MainActivity extends AppCompatActivity {
         }
 
         Uri uri = Uri.parse(directory);
-        this.getApp().startSyncTask(this.getSyncTaskCallbacks(), username, password, uri);
+//        this.getApp().startSyncTask(this.getSyncTaskCallbacks(), username, password, uri);
+        Intent intent = new Intent(this, SyncService.class);
+        intent.putExtra("username", username);
+        intent.putExtra("password", password);
+        intent.putExtra("directory_uri", uri);
+        this.getApp().startForegroundService(intent);
     }
-
-    private static final String NOTIFICATION_ID_SYNC_PROGRESS = "sync_progress";
 
     private void registerNotificationChannels() {
         NotificationManager notificationManager = getSystemService(NotificationManager.class);
         for (NotificationChannel channel : notificationManager.getNotificationChannels()) {
-            if (!channel.getId().equals(NOTIFICATION_ID_SYNC_PROGRESS)) {
+            if (!channel.getId().equals(MusicPlayerApp.NOTIFICATION_CHANNEL_SYNC_PROGRESS)) {
                 notificationManager.deleteNotificationChannel(channel.getId());
             }
         }
 
-        NotificationChannel channel = new NotificationChannel(NOTIFICATION_ID_SYNC_PROGRESS, "Sync progress", NotificationManager.IMPORTANCE_LOW);
+        NotificationChannel channel = new NotificationChannel(MusicPlayerApp.NOTIFICATION_CHANNEL_SYNC_PROGRESS, "Sync progress", NotificationManager.IMPORTANCE_LOW);
         notificationManager.createNotificationChannel(channel);
-    }
-
-    private SyncTask.Callbacks getSyncTaskCallbacks() {
-        final ProgressBar progressBar = findViewById(R.id.syncProgressBar);
-        final TextView textView = findViewById(R.id.log);
-        final Button syncButton = findViewById(R.id.sync);
-
-        return new SyncTask.Callbacks() {
-
-            private int previousProgress = -1;
-
-            private void sendNotification(int progress, int progressMax, boolean indeterminate) {
-                NotificationManager notificationManager = getSystemService(NotificationManager.class);
-                NotificationCompat.Builder builder = new NotificationCompat.Builder(MainActivity.this, NOTIFICATION_ID_SYNC_PROGRESS);
-                builder.setContentTitle("Downloading")
-                        .setContentText("Synchronising music from music player")
-                        .setSmallIcon(R.drawable.music);
-
-                // Issue the initial notification with zero progress
-                builder.setProgress(progressMax, progress, indeterminate);
-                notificationManager.notify(1, builder.build());
-            }
-
-            @Override
-            public void onStart() {
-                syncButton.post(() -> syncButton.setEnabled(false));
-                progressBar.post(() -> {
-                    progressBar.setIndeterminate(true);
-                });
-
-                runOnUiThread(() -> {
-                    sendNotification(0, 0, true);
-                });
-            }
-
-            @Override
-            public void setProgress(int progress, int progressMax) {
-                progressBar.post(() -> {
-                    progressBar.setIndeterminate(false);
-                    progressBar.setProgress(progress);
-                    progressBar.setMax(progressMax);
-                });
-
-                if (progress != this.previousProgress) {
-                    runOnUiThread(() -> {
-                        sendNotification(progress, progressMax, false);
-                    });
-                    this.previousProgress = progress;
-                }
-            }
-
-            @Override
-            public void log(CharSequence message) {
-                System.out.println(message);
-                textView.post(() -> {
-                    ScrollView scrollView = findViewById(R.id.scrollView2);
-                    textView.append(message);
-                    textView.append("\n");
-                    scrollView.fullScroll(View.FOCUS_DOWN);
-                });
-            }
-
-            @Override
-            public void onFinish() {
-                syncButton.post(() -> syncButton.setEnabled(true));
-                progressBar.post(() -> {
-                    progressBar.setIndeterminate(false);
-                    progressBar.setProgress(0);
-                });
-            }
-        };
     }
 
 }
